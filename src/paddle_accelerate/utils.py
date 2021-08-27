@@ -73,9 +73,7 @@ def _gpu_gather(tensor):
         raise TypeError(
             f"Can't gather the values of type {type(tensor)}, only of nested list/tuple/dicts of tensors."
         )
-    output_tensors = [
-        tensor.clone() for _ in range(dist.get_world_size())
-    ]
+    output_tensors = []
     dist.all_gather(output_tensors, tensor)
     return paddle.concat(output_tensors, axis=0)
 
