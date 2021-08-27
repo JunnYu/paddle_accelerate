@@ -14,7 +14,9 @@
 import os
 from distutils.util import strtobool
 from enum import Enum
+
 import paddle.distributed as dist
+
 
 def get_int_from_env(env_keys, default):
     """Returns the first positive env value found in the `env_keys` list or the default."""
@@ -34,7 +36,7 @@ def parse_flag_from_env(key, default=False):
 
 class DistributedType(str, Enum):
     # Subclassing str as well as Enum allows the `DistributedType` to be JSON-serializable out of the box.
-    NO = "NO"
+    SINGLE_GPU = "SINGLE_GPU"
     MULTI_GPU = "MULTI_GPU"
 
 
@@ -49,23 +51,17 @@ class AcceleratorState:
                     "Please make sure to properly initialize your accelerator via `accelerator = Accelerator()` "
                     "before using any functionality from the `accelerate` library."
                 )
-            elif int(os.environ.get("LOCAL_RANK", -1)) != -1:
+            self.num_processes = dist.get_rank() + 1
+            if self.num_processes > 0:
+                self.distributed_type = DistributedType.SINGLE_GPU
+            else:
                 self.distributed_type = DistributedType.MULTI_GPU
                 dist.init_parallel_env()
-                self.num_processes = dist.get_rank() + 1
-                self.local_process_index = int(os.environ.get("LOCAL_RANK", -1))
-                self.device = f"gpu:{self.local_process_index}"
-                self.use_fp16 = (
-                    parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
-                )
-            else:
-                self.distributed_type = DistributedType.NO
-                self.num_processes = dist.get_rank() + 1
-                self.local_process_index = 0
-                self.device = f"gpu:{self.local_process_index}"
-                self.use_fp16 = (
-                    parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
-                )
+            self.local_process_index = 0
+            self.device = f"gpu:{self.local_process_index}"
+            self.use_fp16 = (
+                parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
+            )
 
             self.initialized = True
 

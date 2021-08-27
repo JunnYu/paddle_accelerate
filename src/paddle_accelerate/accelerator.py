@@ -83,7 +83,6 @@ class Accelerator:
         self._optimizers = []
         self._models = []
 
-
     @property
     def distributed_type(self):
         return self.state.distributed_type

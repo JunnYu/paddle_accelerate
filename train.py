@@ -48,9 +48,7 @@ def main(args):
     )
     train_dataloader = get_train_dataloader(tokenizer, args)
     dev_dataloader = get_dev_dataloader(tokenizer, args)
-    model, optimizer = accelerator.prepare(
-        model, optimizer
-    )
+    model, optimizer = accelerator.prepare(model, optimizer)
 
     loss_fct = nn.CrossEntropyLoss()
     global_step = 0
@@ -92,6 +90,7 @@ def main(args):
                         tokenizer.save_pretrained(args.output_dir)
                         accelerator.print(f"save into {args.output_dir}")
 
+
 if __name__ == "__main__":
     args = Config(
         task_name="rte",
@@ -105,6 +104,6 @@ if __name__ == "__main__":
         logging_steps=10,
         save_steps=50,
         seed=42,
-        output_dir="outputs"
+        output_dir="outputs",
     )
     main(args)

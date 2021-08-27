@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.distributed as dist
 import random
+
 import numpy as np
 import paddle
+import paddle.distributed as dist
 
 from .state import AcceleratorState, DistributedType
-
 
 
 def set_seed(seed: int):
@@ -141,10 +141,7 @@ def pad_across_processes(tensor, axis=0, pad_index=0, pad_first=False):
     old_size = tensor.shape
     new_size = list(old_size)
     new_size[axis] = max_size
-    new_tensor = (
-        paddle.zeros(tuple(new_size), dtype=tensor.dtype)
-        + pad_index
-    )
+    new_tensor = paddle.zeros(tuple(new_size), dtype=tensor.dtype) + pad_index
     if pad_first:
         indices = tuple(
             slice(max_size - old_size[axis], max_size) if i == axis else slice(None)
