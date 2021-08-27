@@ -1,0 +1,2 @@
+export LOCAL_RANK=0
+python -m paddle.distributed.launch --gpus "0,1,2" eval_paddle.py --model_name_or_path step-25000 --length_penalty 1.0 --num_beams 4 --eval_batch_size 16 --max_source_length 1024 --max_target_length 512 --evaluate_file ./caches/cnndailymail/cnn_dailymail_dev.json 

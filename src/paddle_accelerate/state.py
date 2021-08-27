@@ -51,17 +51,23 @@ class AcceleratorState:
                     "Please make sure to properly initialize your accelerator via `accelerator = Accelerator()` "
                     "before using any functionality from the `accelerate` library."
                 )
-            self.num_processes = dist.get_rank() + 1
-            if self.num_processes > 0:
-                self.distributed_type = DistributedType.SINGLE_GPU
-            else:
+            elif int(os.environ.get("LOCAL_RANK", -1)) != -1:
                 self.distributed_type = DistributedType.MULTI_GPU
                 dist.init_parallel_env()
-            self.local_process_index = 0
-            self.device = f"gpu:{self.local_process_index}"
-            self.use_fp16 = (
-                parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
-            )
+                self.num_processes = dist.get_rank() + 1
+                self.local_process_index = int(os.environ.get("LOCAL_RANK", -1))
+                self.device = f"gpu:{self.local_process_index}"
+                self.use_fp16 = (
+                    parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
+                )
+            else:
+                self.distributed_type = DistributedType.SINGLE_GPU
+                self.num_processes = dist.get_rank() + 1
+                self.local_process_index = 0
+                self.device = f"gpu:{self.local_process_index}"
+                self.use_fp16 = (
+                    parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
+                )
 
             self.initialized = True
 
