@@ -19,7 +19,6 @@ from typing import List, Optional
 
 import paddle
 
-from .data_loader import prepare_data_loader
 from .kwargs_handlers import (
     DistributedDataParallelKwargs,
     GradScalerKwargs,
@@ -41,15 +40,10 @@ logger = logging.getLogger(__name__)
 class Accelerator:
     def __init__(
         self,
-        split_batches: bool = False,
         fp16: bool = None,
         kwargs_handlers: Optional[List[KwargsHandler]] = None,
     ):
-
         self.state = AcceleratorState(fp16=fp16, _from_accelerator=True)
-
-        self.split_batches = split_batches
-
         # Kwargs handlers
         self.scaler_handler = None
         self.ddp_handler = None
@@ -99,21 +93,12 @@ class Accelerator:
         return self.state.num_processes
 
     @property
-    def process_index(self):
-        return self.state.process_index
-
-    @property
     def local_process_index(self):
-        return self.state.local_process_index
+        return paddle.distributed.get_rank()
 
     @property
     def device(self):
         return self.state.device
-
-    @property
-    def is_main_process(self):
-        """True for one process only."""
-        return self.process_index == 0
 
     @property
     def is_local_main_process(self):
@@ -133,15 +118,6 @@ class Accelerator:
         """
         yield from self._goes_first(self.is_local_main_process)
 
-    @contextmanager
-    def main_process_first(self):
-        """
-        Lets the main process go first inside a with block.
-
-        The other processes will enter the with block after the main process exits.
-        """
-        yield from self._goes_first(self.is_main_process)
-
     def _goes_first(self, is_main):
         if not is_main:
             self.wait_for_everyone()
@@ -159,9 +135,7 @@ class Accelerator:
             print(*args, **kwargs)
 
     def _prepare_one(self, obj):
-        if isinstance(obj, paddle.io.DataLoader):
-            return self.prepare_data_loader(obj)
-        elif isinstance(obj, paddle.nn.Layer):
+        if isinstance(obj, paddle.nn.Layer):
             self._models.append(obj)
             return self.prepare_model(obj)
         elif isinstance(obj, paddle.optimizer.Optimizer):
@@ -191,14 +165,6 @@ class Accelerator:
 
         return model
 
-    def prepare_data_loader(self, data_loader):
-        return prepare_data_loader(
-            data_loader,
-            num_processes=self.num_processes,
-            process_index=self.process_index,
-            split_batches=self.split_batches,
-        )
-
     def prepare_optimizer(self, optimizer):
         return AcceleratedOptimizer(optimizer, scaler=self.scaler)
 
@@ -206,13 +172,10 @@ class Accelerator:
         """
         Use :obj:`accelerator.backward(loss)` in lieu of :obj:`loss.backward()`.
         """
-        scaled = None
         if self.scaler is not None:
-            scaled = self.scaler.scale(loss)
-            scaled.backward(**kwargs)
+            self.scaler.scale(loss).backward(**kwargs)
         else:
             loss.backward(**kwargs)
-        return scaled
 
     def gather(self, tensor):
         """
@@ -233,7 +196,7 @@ class Accelerator:
         """
         return gather(tensor)
 
-    def pad_across_processes(self, tensor, dim=0, pad_index=0, pad_first=False):
+    def pad_across_processes(self, tensor, axis=0, pad_index=0, pad_first=False):
         """
         Recursively pad the tensors in a nested list/tuple/dictionary of tensors from all devices to the same size so
         they can safely be gathered.
@@ -249,7 +212,7 @@ class Accelerator:
                 Whether to pad at the beginning or the end.
         """
         return pad_across_processes(
-            tensor, dim=dim, pad_index=pad_index, pad_first=pad_first
+            tensor, axis=axis, pad_index=pad_index, pad_first=pad_first
         )
 
     def unwrap_model(self, model):

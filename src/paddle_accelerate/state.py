@@ -16,7 +16,6 @@ from distutils.util import strtobool
 from enum import Enum
 import paddle.distributed as dist
 
-
 def get_int_from_env(env_keys, default):
     """Returns the first positive env value found in the `env_keys` list or the default."""
     for e in env_keys:
@@ -53,8 +52,7 @@ class AcceleratorState:
             elif int(os.environ.get("LOCAL_RANK", -1)) != -1:
                 self.distributed_type = DistributedType.MULTI_GPU
                 dist.init_parallel_env()
-                self.num_processes = dist.get_world_size()
-                self.process_index = dist.get_rank()
+                self.num_processes = dist.get_rank() + 1
                 self.local_process_index = int(os.environ.get("LOCAL_RANK", -1))
                 self.device = f"gpu:{self.local_process_index}"
                 self.use_fp16 = (
@@ -62,8 +60,7 @@ class AcceleratorState:
                 )
             else:
                 self.distributed_type = DistributedType.NO
-                self.num_processes = dist.get_world_size()
-                self.process_index = dist.get_rank()
+                self.num_processes = dist.get_rank() + 1
                 self.local_process_index = 0
                 self.device = f"gpu:{self.local_process_index}"
                 self.use_fp16 = (
@@ -76,7 +73,6 @@ class AcceleratorState:
         repr = (
             f"Distributed environment: {self.distributed_type}\n"
             f"Num processes: {self.num_processes}\n"
-            f"Process index: {self.process_index}\n"
             f"Local process index: {self.local_process_index}\n"
             f"Device: {self.device}\n"
             f"Use FP16 precision: {self.use_fp16}\n"

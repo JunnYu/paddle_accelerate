@@ -142,7 +142,7 @@ def pad_across_processes(tensor, axis=0, pad_index=0, pad_first=False):
     new_size = list(old_size)
     new_size[axis] = max_size
     new_tensor = (
-        paddle.zeros(tuple(new_size), dtype=tensor.dtype, place=tensor.place)
+        paddle.zeros(tuple(new_size), dtype=tensor.dtype)
         + pad_index
     )
     if pad_first:
@@ -179,5 +179,5 @@ def save(obj, f):
         obj: The data to save
         f: The file (or file-like object) to use to save the data
     """
-    if AcceleratorState().local_process_index == 0:
+    if paddle.distributed.get_rank() == 0:
         paddle.save(obj, f)

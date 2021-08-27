@@ -48,8 +48,8 @@ def main(args):
     )
     train_dataloader = get_train_dataloader(tokenizer, args)
     dev_dataloader = get_dev_dataloader(tokenizer, args)
-    model, optimizer, train_dataloader, dev_dataloader = accelerator.prepare(
-        model, optimizer, train_dataloader, dev_dataloader
+    model, optimizer = accelerator.prepare(
+        model, optimizer
     )
 
     loss_fct = nn.CrossEntropyLoss()
@@ -62,8 +62,8 @@ def main(args):
             input_ids, segment_ids, labels = batch
             logits = model(input_ids, segment_ids)
             loss = loss_fct(logits, labels)
-            scaled = accelerator.backward(loss)
-            optimizer.step(scaled)
+            accelerator.backward(loss)
+            optimizer.step()
             optimizer.zero_grad()
             global_step += 1
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     args = Config(
         task_name="rte",
         num_train_epochs=20,
-        train_batch_size=16,
+        train_batch_size=8,
         eval_batch_size=32,
         num_workers=0,
         is_test=False,

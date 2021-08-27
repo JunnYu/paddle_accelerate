@@ -46,8 +46,16 @@ class AcceleratedOptimizer(paddle.optimizer.Optimizer):
     def clear_grad(self):
         self.optimizer.clear_grad()
 
-    def step(self, scaled=None):
-        if self.scaler is not None and scaled is not None:
-            self.scaler.minimize(self.optimizer, scaled)
+    def step(self):
+        if self.scaler is not None:
+            self.scaler._unscale(self.optimizer)
+            if self.scaler._found_inf:
+                self.scaler._cache_founf_inf = True
+            else:
+                self.optimizer.step()
+                self.scaler._cache_founf_inf = False
+
+            if self.scaler._use_dynamic_loss_scaling:
+                self.scaler._update()
         else:
             self.optimizer.step()
