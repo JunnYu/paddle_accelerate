@@ -22,7 +22,6 @@ class AcceleratedOptimizer(paddle.optimizer.Optimizer):
         self.optimizer = optimizer
         self.scaler = scaler
         self.state = AcceleratorState()
-        self._is_overflow = False
 
     @property
     def _parameter_list(self):

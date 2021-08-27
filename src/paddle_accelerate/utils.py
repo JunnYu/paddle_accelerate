@@ -12,22 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib
-import os
+import paddle.distributed as dist
 import random
-from enum import Enum
-from typing import List, Optional, Union
-
 import numpy as np
 import paddle
 
 from .state import AcceleratorState, DistributedType
 
-
-class RNGType(Enum):
-    PADDLE = "paddle"
-    CUDA = "cuda"
-    GENERATOR = "generator"
 
 
 def set_seed(seed: int):
@@ -42,52 +33,15 @@ def set_seed(seed: int):
     paddle.seed(seed)
 
 
-def get_cpu_rng_state():
-    return paddle.fluid.core.default_cpu_generator().get_state()
-
-
-def set_cpu_rng_state(rng_state):
-    return paddle.fluid.core.default_cpu_generator().set_state(rng_state)
-
-
 def get_cuda_rng_state():
     return paddle.fluid.core.default_cuda_generator(0).get_state()
 
 
-def set_cuda_rng_state(state):
-    return paddle.fluid.core.default_cuda_generator(0).set_state(state)
-
-
-def synchronize_rng_state(rng_type: Optional[RNGType] = None, generator=None):
-    # Get the proper rng state
-    if rng_type == RNGType.PADDLE:
-        rng_state = get_cpu_rng_state()
-    elif rng_type == RNGType.CUDA:
-        rng_state = get_cuda_rng_state()
-    elif rng_type == RNGType.GENERATOR:
-        assert generator is not None, "Need a generator to synchronize its seed."
-        rng_state = generator.get_state()
-
-    # Broadcast the rng state from device 0 to other devices
+def synchronize_rng_states():
+    rng_state = get_cuda_rng_state()
     state = AcceleratorState()
-    if state.distributed_type == DistributedType.MULTI_GPU:
-        paddle.distributed.broadcast(rng_state, 0)
-
-    # Set the broadcast rng state
-    if rng_type == RNGType.PADDLE:
-        set_cpu_rng_state(rng_state)
-    elif rng_type == RNGType.CUDA:
-        set_cuda_rng_state(rng_state)
-    elif rng_type == RNGType.GENERATOR:
-        generator.set_state(rng_state)
-
-
-def synchronize_rng_states(
-    rng_types: List[Union[str, RNGType]],
-    generator: Optional[paddle.fluid.core_avx.Generator] = None,
-):
-    for rng_type in rng_types:
-        synchronize_rng_state(RNGType(rng_type), generator=generator)
+    for i in range(state.num_processes):
+        paddle.fluid.core.default_cuda_generator(i).set_state(rng_state)
 
 
 def honor_type(obj, generator):
@@ -120,9 +74,9 @@ def _gpu_gather(tensor):
             f"Can't gather the values of type {type(tensor)}, only of nested list/tuple/dicts of tensors."
         )
     output_tensors = [
-        tensor.clone() for _ in range(paddle.distributed.get_world_size())
+        tensor.clone() for _ in range(dist.get_world_size())
     ]
-    paddle.distributed.all_gather(output_tensors, tensor)
+    dist.all_gather(output_tensors, tensor)
     return paddle.concat(output_tensors, axis=0)
 
 
@@ -216,7 +170,7 @@ def wait_for_everyone():
         Make sure all processes will reach this instruction otherwise one of your processes will hang forever.
     """
     if AcceleratorState().distributed_type == DistributedType.MULTI_GPU:
-        paddle.distributed.barrier()
+        dist.barrier()
 
 
 def save(obj, f):

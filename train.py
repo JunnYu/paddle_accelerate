@@ -84,14 +84,20 @@ def main(args):
                 res = metric.accumulate()
                 accelerator.print(f"epoch {epoch}: acc = ", res)
                 accelerator.print("=" * 50)
-
+                if args.output_dir is not None:
+                    accelerator.wait_for_everyone()
+                    if accelerator.is_local_main_process:
+                        unwrapped_model = accelerator.unwrap_model(model)
+                        unwrapped_model.save_pretrained(args.output_dir)
+                        tokenizer.save_pretrained(args.output_dir)
+                        accelerator.print(f"save into {args.output_dir}")
 
 if __name__ == "__main__":
     args = Config(
         task_name="rte",
         num_train_epochs=20,
-        train_batch_size=4,
-        eval_batch_size=16,
+        train_batch_size=16,
+        eval_batch_size=32,
         num_workers=0,
         is_test=False,
         max_seq_length=128,
@@ -99,5 +105,6 @@ if __name__ == "__main__":
         logging_steps=10,
         save_steps=50,
         seed=42,
+        output_dir="outputs"
     )
     main(args)

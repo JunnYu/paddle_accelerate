@@ -15,7 +15,7 @@
 import gc
 import logging
 from contextlib import contextmanager
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import paddle
 
@@ -28,7 +28,6 @@ from .kwargs_handlers import (
 from .optimizer import AcceleratedOptimizer
 from .state import AcceleratorState, DistributedType
 from .utils import (
-    RNGType,
     extract_model_from_parallel,
     gather,
     pad_across_processes,
@@ -44,7 +43,6 @@ class Accelerator:
         self,
         split_batches: bool = False,
         fp16: bool = None,
-        rng_types: Optional[List[Union[str, RNGType]]] = None,
         kwargs_handlers: Optional[List[KwargsHandler]] = None,
     ):
 
@@ -91,9 +89,6 @@ class Accelerator:
         self._optimizers = []
         self._models = []
 
-        # RNG Types
-        if rng_types is None:
-            self.rng_types = ["generator"]
 
     @property
     def distributed_type(self):
@@ -202,7 +197,6 @@ class Accelerator:
             num_processes=self.num_processes,
             process_index=self.process_index,
             split_batches=self.split_batches,
-            rng_types=self.rng_types.copy(),
         )
 
     def prepare_optimizer(self, optimizer):

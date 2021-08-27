@@ -14,8 +14,7 @@
 import os
 from distutils.util import strtobool
 from enum import Enum
-
-import paddle
+import paddle.distributed as dist
 
 
 def get_int_from_env(env_keys, default):
@@ -37,7 +36,6 @@ def parse_flag_from_env(key, default=False):
 class DistributedType(str, Enum):
     # Subclassing str as well as Enum allows the `DistributedType` to be JSON-serializable out of the box.
     NO = "NO"
-    SINGLE_GPU = "SINGLE_GPU"
     MULTI_GPU = "MULTI_GPU"
 
 
@@ -54,18 +52,18 @@ class AcceleratorState:
                 )
             elif int(os.environ.get("LOCAL_RANK", -1)) != -1:
                 self.distributed_type = DistributedType.MULTI_GPU
-                paddle.distributed.init_parallel_env()
-                self.num_processes = paddle.distributed.get_world_size()
-                self.process_index = paddle.distributed.get_rank()
+                dist.init_parallel_env()
+                self.num_processes = dist.get_world_size()
+                self.process_index = dist.get_rank()
                 self.local_process_index = int(os.environ.get("LOCAL_RANK", -1))
                 self.device = f"gpu:{self.local_process_index}"
                 self.use_fp16 = (
                     parse_flag_from_env("USE_FP16", False) if fp16 is None else fp16
                 )
             else:
-                self.distributed_type = DistributedType.SINGLE_GPU
-                self.num_processes = paddle.distributed.get_world_size()
-                self.process_index = paddle.distributed.get_rank()
+                self.distributed_type = DistributedType.NO
+                self.num_processes = dist.get_world_size()
+                self.process_index = dist.get_rank()
                 self.local_process_index = 0
                 self.device = f"gpu:{self.local_process_index}"
                 self.use_fp16 = (

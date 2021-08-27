@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Union
+from typing import  Optional
 
 from paddle.io import BatchSampler, DataLoader, IterableDataset
 
 from .state import AcceleratorState
-from .utils import RNGType, synchronize_rng_states
+from .utils import synchronize_rng_states
 
 _PADDLE_DATALOADER_KWARGS = {
     "feed_list": None,
@@ -207,14 +207,11 @@ class IterableDatasetShard(IterableDataset):
 
 
 class DataLoaderShard(DataLoader):
-    def __init__(self, dataset, rng_types=None, generator=None, **kwargs):
+    def __init__(self, dataset, **kwargs):
         super().__init__(dataset, **kwargs)
-        self.rng_types = rng_types
-        self.generator = generator
 
     def __iter__(self):
-        if self.rng_types is not None:
-            synchronize_rng_states(self.rng_types, self.generator)
+        synchronize_rng_states()
         for batch in super().__iter__():
             yield batch
 
@@ -223,8 +220,7 @@ def prepare_data_loader(
     dataloader: DataLoader,
     num_processes: Optional[int] = None,
     process_index: Optional[int] = None,
-    split_batches: bool = False,
-    rng_types: Optional[List[Union[str, RNGType]]] = None,
+    split_batches: bool = False
 ) -> DataLoader:
 
     # Grab defaults from AcceleratorState
@@ -248,12 +244,10 @@ def prepare_data_loader(
         if not isinstance(new_dataset, IterableDataset)
         else None
     )
-    generator = getattr(dataloader, "generator", None)
+
     # No change if no multiprocess
     if num_processes != 1:
         if isinstance(new_dataset, IterableDataset):
-            if getattr(dataloader.dataset, "generator", None) is not None:
-                generator = dataloader.dataset.generator
             new_dataset = IterableDatasetShard(
                 new_dataset,
                 batch_size=dataloader.batch_size,
@@ -263,9 +257,6 @@ def prepare_data_loader(
                 split_batches=split_batches,
             )
         else:
-            if getattr(dataloader.batch_sampler, "generator", None) is not None:
-                generator = dataloader.batch_sampler.generator
-
             new_batch_sampler = BatchSamplerShard(
                 dataloader.batch_sampler,
                 num_processes=num_processes,
@@ -275,9 +266,6 @@ def prepare_data_loader(
 
     # We ignore all of those since they are all dealt with by our new_batch_sampler
     ignore_kwargs = ["batch_size", "shuffle", "batch_sampler", "drop_last"]
-
-    if rng_types is not None and generator is None and "generator" in rng_types:
-        rng_types.remove("generator")
 
     kwargs = {
         k: getattr(dataloader, k, _PADDLE_DATALOADER_KWARGS[k])
@@ -296,7 +284,5 @@ def prepare_data_loader(
     return DataLoaderShard(
         new_dataset,
         batch_sampler=new_batch_sampler,
-        rng_types=rng_types,
-        generator=generator,
         **kwargs,
     )
